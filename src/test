@@ -1,7 +1,12 @@
-nntag(ex_tag, tag_with_val=val) {
+nntag(ex_tag,tag_with_val=val) {
 this is an example of something with a tag and a tag with a value
 }
 
 non-tagged stuff
 
-nntag() {}
+nntag(tag 1) {
+this tag has another tag in it
+nntag(tag 2) {
+    this is a subtag
+}nntag(tag 2)
+}nntag(tag 1)
