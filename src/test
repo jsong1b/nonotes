@@ -1,3 +1,7 @@
 nntag(ex_tag, tag_with_val=val) {
 this is an example of something with a tag and a tag with a value
 }
+
+non-tagged stuff
+
+nntag() {}
