@@ -1,16 +1,10 @@
-#include <stdio.h>
+#include "libnonotes.h"
 
-#define BUF_SIZE 128
+#include <assert.h>
+#include <stdio.h>
 
 #define NNTAG_STR_LEN 6
 const char nntag_str[NNTAG_STR_LEN] = "nntag";
-
-typedef enum ParseStateOld {
-    NO_STATE,
-    IN_TAG_ARGS,
-    BEFORE_TAG_BODY,
-    IN_TAG_BODY
-} ParseStateOld;
 
 typedef enum {
     PEEK_AHEAD_TAGS,
@@ -18,84 +12,40 @@ typedef enum {
     PEEK_AHEAD_BODY
 } PeekAheadStage;
 
-typedef struct ParseState {
-    enum {
-        RULES_NOOP,
-        RULES_ARGS,
-        RULES_BODY
-    } rules_state;
+void libnonotes_parseC(libnonotes_ParseState* parse_state, char c) {
 
-    char acc[BUF_SIZE];
-    int acc_idx;
-    enum {
-        ACC_NOOP,
-        ACC_COMPLETE,
-        ACC_INCOMPLETE
-    } acc_state;
+    int peek_behind_idx = 0;
+    char peek_behind = '\0';
 
-    FILE* fp;
-    int loc;
+    if (parse_state->acc_state == ACC_SUBMIT) {
+        switch (parse_state->rules_state) {
+        case RULES_NOOP:
+            parse_state->rules_state = RULES_ARGS;
+            parse_state->acc_state = ACC_NOOP;
+            parse_state->body_len = 0;
+            break;
+        case RULES_ARGS:
+            peek_behind_idx = (parse_state->buf_idx - 1 < 0) ? LIBNONOTES_BUF_SIZE - 1 : parse_state->buf_idx - 1;
+            peek_behind = parse_state->buf[peek_behind_idx];
 
-    char buf[BUF_SIZE];
-    int buf_idx;
-
-    int bracket_level;
-} ParseState;
-
-void parseC(ParseState *parse_state, char c);
-
-
-
-int main(void) {
-    char c = '\0';
-
-    FILE* fp = tmpfile();
-    if (fp == NULL) return 1;
-    while ((c = fgetc(stdin)) != EOF) fputc(c, fp);
-    fputc(EOF, fp);
-
-    ParseStateOld parse_state_old = NO_STATE;
-    char buf[BUF_SIZE] = "";
-    int buf_idx = 0;
-    int loc = 0;
-    int tag_count = 0;
-    int tag_body_level = 0;
-
-
-    ParseState parse_state = { 0 };
-    parse_state.fp = fp;
-    fseek(fp, 0, 0);
-    while ((c = fgetc(fp)) != EOF) {
-        parseC(&parse_state, c);
-
-        printf("\n==========");
-        printf("char: %c", c);
-        printf("\nfile_loc: %d", parse_state.loc);
-        printf("\nacc_idx: %d", parse_state.acc_idx);
-        printf("\nbuf_idx: %d", parse_state.buf_idx);
-        printf("\nrules: ");
-        switch (parse_state.rules_state) {
-        case RULES_NOOP: printf("noop"); break;
-        case RULES_ARGS: printf("args"); break;
-        case RULES_BODY: printf("body"); break;
+            if (peek_behind == ',') {
+                parse_state->acc_state = ACC_NOOP;
+            } else if (peek_behind == ')') {
+                parse_state->acc_state = ACC_COMPLETE;
+            }
+            break;
+        case RULES_BODY:
+            parse_state->acc_state = ACC_INCOMPLETE;
+            break;
         }
-        printf("\nacc state: ");
-        switch (parse_state.acc_state) {
-        case ACC_NOOP: printf("noop"); break;
-        case ACC_COMPLETE: printf("complete"); break;
-        case ACC_INCOMPLETE: printf("incomplete"); break;
-        }
-        printf("\nacc:\n%s\n", parse_state.acc);
+
+        libnonotes_parseC(parse_state, c);
+        return;
     }
 
-    fclose(fp);
-    return 0;
-}
-
-void parseC(ParseState* parse_state, char c) {
     parse_state->loc++;
     parse_state->buf[parse_state->buf_idx] = c;
-    parse_state->buf_idx = (parse_state->buf_idx + 1 >= BUF_SIZE) ? 0 : parse_state->buf_idx + 1;
+    parse_state->buf_idx = (parse_state->buf_idx + 1 >= LIBNONOTES_BUF_SIZE) ? 0 : parse_state->buf_idx + 1;
     parse_state->buf[parse_state->buf_idx] = '\0';
 
     switch (parse_state->rules_state) {
@@ -108,9 +58,8 @@ void parseC(ParseState* parse_state, char c) {
         /* check behind '(' for the "nntag" string */
         int nntag_check_idx = 0;
         while (nntag_str[nntag_check_idx] != '\0') {
-            int peek_behind_idx = parse_state->buf_idx - (NNTAG_STR_LEN + nntag_check_idx);
-            peek_behind_idx = (nntag_check_idx < 0) ? BUF_SIZE - nntag_check_idx : nntag_check_idx;
-            char peek_behind = parse_state->buf[peek_behind_idx];
+            peek_behind_idx = (parse_state->buf_idx + nntag_check_idx - NNTAG_STR_LEN < 0) ? LIBNONOTES_BUF_SIZE + nntag_check_idx - NNTAG_STR_LEN : parse_state->buf_idx + nntag_check_idx - NNTAG_STR_LEN;
+            peek_behind = parse_state->buf[peek_behind_idx];
 
             if (nntag_str[nntag_check_idx] != peek_behind) {
                 tag_valid = 0;
@@ -158,7 +107,8 @@ void parseC(ParseState* parse_state, char c) {
             return;
         }
 
-        parse_state->rules_state = RULES_ARGS;
+        parse_state->acc_state = ACC_SUBMIT;
+        parse_state->tag_count++;
 
         break;
     case RULES_ARGS:
@@ -175,11 +125,7 @@ void parseC(ParseState* parse_state, char c) {
             break;
         case ACC_INCOMPLETE:
             if (c == ',' || c == ')') {
-                if (c == ',') {
-                    parse_state->acc_state = ACC_NOOP;
-                } else if (c == ')') {
-                    parse_state->acc_state = ACC_COMPLETE;
-                }
+                parse_state->acc_state = ACC_SUBMIT;
                 return;
             }
             parse_state->acc[parse_state->acc_idx] = c;
@@ -192,21 +138,33 @@ void parseC(ParseState* parse_state, char c) {
                 parse_state->rules_state = RULES_BODY;
                 parse_state->acc_idx = 0;
                 parse_state->acc_state = ACC_NOOP;
+                parse_state->bracket_level = 0;
             }
 
             break;
         }
         break;
     case RULES_BODY:
-        if (c == '{' && parse_state->bracket_level == 0) {
+        if (parse_state->acc_state == ACC_COMPLETE) {
             parse_state->rules_state = RULES_NOOP;
+            return;
+        }
+
+        parse_state->acc[0] = c;
+        parse_state->acc[1] = '\0';
+        parse_state->body_len++;
+        if (c == '}' && parse_state->bracket_level <= 0) {
             parse_state->acc_state = ACC_COMPLETE;
+            parse_state->acc[0] = '\0';
+            parse_state->loc = parse_state->loc - parse_state->body_len;
+            fseek(parse_state->fp, parse_state->loc, 0);
             return;
         } else if (c == '{') {
             parse_state->bracket_level++;
-        } else if ('}') {
+        } else if (c == '}') {
             parse_state->bracket_level--;
         }
+        parse_state->acc_state = ACC_SUBMIT;
 
         break;
     }
