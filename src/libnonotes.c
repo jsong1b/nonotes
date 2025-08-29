@@ -142,42 +142,43 @@ void libnonotes_parseC(libnonotes_ParseState* parse_state, char c) {
             return;
 
             break;
+        case ACC_COMPLETE:
+            assert(0 && "unreachable");
+            break;
         }
         break;
     case RULES_BODY:
-        if (parse_state->acc_state == ACC_SUBMIT) {
-            parse_state->acc_state = ACC_INCOMPLETE;
-            libnonotes_parseC(parse_state, c);
-            return;
-        } else if (parse_state->acc_state == ACC_COMPLETE) {
-            parse_state->rules_state = RULES_NOOP;
-            parse_state->acc_state = ACC_NOOP;
-            return;
-        } else if (parse_state->acc_state == ACC_NOOP) {
+        switch (parse_state->acc_state) {
+        case ACC_NOOP:
             if (c == '{') {
                 parse_state->acc_state = ACC_INCOMPLETE;
                 parse_state->bracket_level = 0;
             }
-
-            return;
+            break;
+        case ACC_INCOMPLETE:
+            parse_state->acc[0] = c;
+            parse_state->acc[1] = '\0';
+            parse_state->body_len++;
+            if (c == '}' && parse_state->bracket_level <= 0) {
+                parse_state->acc_state = ACC_COMPLETE;
+                parse_state->acc[0] = '\0';
+                parse_state->loc = parse_state->loc - parse_state->body_len;
+                fseek(parse_state->fp, parse_state->loc, 0);
+                return;
+            } else if (c == '{') {
+                parse_state->bracket_level++;
+            } else if (c == '}') {
+                parse_state->bracket_level--;
+            }
+            parse_state->acc_state = ACC_SUBMIT;
+            break;
+        case ACC_SUBMIT:
+            parse_state->acc_state = ACC_INCOMPLETE;
+            libnonotes_parseC(parse_state, c);
+            break;
+        case ACC_COMPLETE:
+            parse_state->rules_state = RULES_NOOP;
+            parse_state->acc_state = ACC_NOOP;
         }
-
-        parse_state->acc[0] = c;
-        parse_state->acc[1] = '\0';
-        parse_state->body_len++;
-        if (c == '}' && parse_state->bracket_level <= 0) {
-            parse_state->acc_state = ACC_COMPLETE;
-            parse_state->acc[0] = '\0';
-            parse_state->loc = parse_state->loc - parse_state->body_len;
-            fseek(parse_state->fp, parse_state->loc, 0);
-            return;
-        } else if (c == '{') {
-            parse_state->bracket_level++;
-        } else if (c == '}') {
-            parse_state->bracket_level--;
-        }
-        parse_state->acc_state = ACC_SUBMIT;
-
-        break;
     }
 }
