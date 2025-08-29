@@ -5,6 +5,10 @@
 #define LIBNONOTES_BUF_SIZE 128
 #endif /* LIBNONOTES_BUF_SIZE */
 
+#ifndef LIBNONOTES_MAX_ARGS
+#define LIBNONOTES_MAX_ARGS 16
+#endif /* LIBNONOTES_MAX_ARGS */
+
 #include <stdio.h>
 
 typedef struct libnonotes_ParseState {
@@ -15,13 +19,16 @@ typedef struct libnonotes_ParseState {
     } rules_state;
 
     char acc[LIBNONOTES_BUF_SIZE];
-    int acc_idx;
+    int acc_len;
     enum {
         ACC_NOOP,
         ACC_COMPLETE,
         ACC_INCOMPLETE,
         ACC_SUBMIT
     } acc_state;
+
+    char args[LIBNONOTES_MAX_ARGS][LIBNONOTES_BUF_SIZE];
+    int args_len;
 
     FILE* fp;
     int loc;

@@ -23,6 +23,8 @@ void libnonotes_parseC(libnonotes_ParseState* parse_state, char c) {
         parse_state->buf[parse_state->buf_idx] = '\0';
     }
 
+    int i = 0;
+
     switch (parse_state->rules_state) {
     case RULES_NOOP:
         if (parse_state->acc_state == ACC_SUBMIT) {
@@ -100,40 +102,41 @@ void libnonotes_parseC(libnonotes_ParseState* parse_state, char c) {
             if (c == ' ' || c == '\t' || c == '\n') {
                 return;
             }
+
             parse_state->acc[0] = c;
             parse_state->acc[1] = '\0';
-            parse_state->acc_idx = 1;
+            parse_state->acc_len = 1;
             parse_state->acc_state = ACC_INCOMPLETE;
 
             break;
         case ACC_INCOMPLETE:
             if (c == ',' || c == ')') {
-                parse_state->acc_state = ACC_SUBMIT;
+                while (i <= parse_state->acc_len) {
+                    parse_state->args[parse_state->args_len][i] = parse_state->acc[i];
+                    i++;
+                }
+                parse_state->args_len++;
+                parse_state->acc_len = 0;
+
+                if (c == ',') {
+                    parse_state->acc_state = ACC_NOOP;
+                } else if (c == ')') {
+                    parse_state->acc_state = ACC_SUBMIT;
+                }
+
                 return;
             }
-            parse_state->acc[parse_state->acc_idx] = c;
-            parse_state->acc_idx++;
-            parse_state->acc[parse_state->acc_idx] = '\0';
 
-            break;
-        case ACC_COMPLETE:
-            if (c == '{') {
-                parse_state->rules_state = RULES_BODY;
-                parse_state->acc_idx = 0;
-                parse_state->acc_state = ACC_NOOP;
-                parse_state->bracket_level = 0;
-            }
+            parse_state->acc[parse_state->acc_len] = c;
+            parse_state->acc_len++;
+            parse_state->acc[parse_state->acc_len] = '\0';
 
             break;
         case ACC_SUBMIT:
-            peek_behind_idx = (parse_state->buf_idx - 1 < 0) ? LIBNONOTES_BUF_SIZE - 1 : parse_state->buf_idx - 1;
-            peek_behind = parse_state->buf[peek_behind_idx];
+            parse_state->rules_state = RULES_BODY;
+            parse_state->acc_state = ACC_NOOP;
 
-            if (peek_behind == ',') {
-                parse_state->acc_state = ACC_NOOP;
-            } else if (peek_behind == ')') {
-                parse_state->acc_state = ACC_COMPLETE;
-            }
+            parse_state->args_len = 0;
 
             libnonotes_parseC(parse_state, c);
             return;
@@ -148,6 +151,14 @@ void libnonotes_parseC(libnonotes_ParseState* parse_state, char c) {
             return;
         } else if (parse_state->acc_state == ACC_COMPLETE) {
             parse_state->rules_state = RULES_NOOP;
+            parse_state->acc_state = ACC_NOOP;
+            return;
+        } else if (parse_state->acc_state == ACC_NOOP) {
+            if (c == '{') {
+                parse_state->acc_state = ACC_INCOMPLETE;
+                parse_state->bracket_level = 0;
+            }
+
             return;
         }
 

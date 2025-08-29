@@ -20,16 +20,22 @@ int main(int argc, char **argv) {
             continue;
         }
 
+        int i = 0;
         switch (parse_state.rules_state) {
         case RULES_NOOP:
             printf("\n===== tag =====\ntag args: [");
             break;
         case RULES_ARGS:
-            printf("%s", parse_state.acc);
-            if (c == ',') {
-                printf(", ");
-            } else if (c == ')') {
-                printf("]\ncontent: ");
+            i = 0;
+            while (i < parse_state.args_len) {
+                printf("%s", parse_state.args[i]);
+                i++;
+
+                if (i < parse_state.args_len) {
+                    printf(", ");
+                } else {
+                    printf("]\ncontent: ");
+                }
             }
 
             break;
@@ -41,8 +47,6 @@ int main(int argc, char **argv) {
             }
             break;
         }
-
-        continue;
     }
 
     return 0;
