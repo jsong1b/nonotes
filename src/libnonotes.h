@@ -27,7 +27,11 @@ typedef struct libnonotes_ParseState {
         ACC_SUBMIT
     } acc_state;
 
-    char args[LIBNONOTES_MAX_ARGS][LIBNONOTES_BUF_SIZE];
+    /* to allow for recursion: this will save both the arg and its scope */
+    struct {
+        char arg[LIBNONOTES_BUF_SIZE];
+        int arg_scope;
+    } args_stack[LIBNONOTES_MAX_ARGS];
     int args_len;
 
     FILE* fp;

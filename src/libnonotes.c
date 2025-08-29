@@ -95,6 +95,14 @@ void libnonotes_parseC(libnonotes_ParseState* parse_state, char c) {
         parse_state->acc_state = ACC_SUBMIT;
         parse_state->tag_count++;
 
+        while (i < parse_state->args_len) {
+            if (parse_state->args_stack[i].arg_scope > -1 && parse_state->loc > parse_state->args_stack[i].arg_scope) {
+                parse_state->args_len = i;
+                break;
+            }
+            i++;
+        }
+
         break;
     case RULES_ARGS:
         switch (parse_state->acc_state) {
@@ -112,7 +120,8 @@ void libnonotes_parseC(libnonotes_ParseState* parse_state, char c) {
         case ACC_INCOMPLETE:
             if (c == ',' || c == ')') {
                 while (i <= parse_state->acc_len) {
-                    parse_state->args[parse_state->args_len][i] = parse_state->acc[i];
+                    parse_state->args_stack[parse_state->args_len].arg[i] = parse_state->acc[i];
+                    parse_state->args_stack[parse_state->args_len].arg_scope = -1;
                     i++;
                 }
                 parse_state->args_len++;
@@ -133,10 +142,9 @@ void libnonotes_parseC(libnonotes_ParseState* parse_state, char c) {
 
             break;
         case ACC_SUBMIT:
+
             parse_state->rules_state = RULES_BODY;
             parse_state->acc_state = ACC_NOOP;
-
-            parse_state->args_len = 0;
 
             libnonotes_parseC(parse_state, c);
             return;
@@ -160,6 +168,13 @@ void libnonotes_parseC(libnonotes_ParseState* parse_state, char c) {
             parse_state->acc[1] = '\0';
             parse_state->body_len++;
             if (c == '}' && parse_state->bracket_level <= 0) {
+                while (i <= parse_state->args_len) {
+                    if (parse_state->args_stack[i].arg_scope == -1) {
+                        parse_state->args_stack[i].arg_scope = parse_state->loc;
+                    }
+                    i++;
+                }
+
                 parse_state->acc_state = ACC_COMPLETE;
                 parse_state->acc[0] = '\0';
                 parse_state->loc = parse_state->loc - parse_state->body_len;

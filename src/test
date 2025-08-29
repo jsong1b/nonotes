@@ -9,4 +9,16 @@ this tag has another tag in it
 nntag(tag 2) {
     this is a subtag
 }nntag(tag 2)
+
+stuff inbetween
+
+nntag(tag 3) {
+    this is another subtag
+    nntag(tag 4) {
+        this is another subtag in a subtag
+    }nntag(tag 4)
+
+    more stuff
+}nntag(tag 3)
+
 }nntag(tag 1)

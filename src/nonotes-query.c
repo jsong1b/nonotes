@@ -28,7 +28,7 @@ int main(int argc, char **argv) {
         case RULES_ARGS:
             i = 0;
             while (i < parse_state.args_len) {
-                printf("%s", parse_state.args[i]);
+                printf("%s", parse_state.args_stack[i].arg);
                 i++;
 
                 if (i < parse_state.args_len) {
